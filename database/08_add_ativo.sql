@@ -1,0 +1,5 @@
+
+USE clinica_veterinaria;
+
+ALTER TABLE pet     ADD COLUMN ativo TINYINT(1) NOT NULL DEFAULT 1;
+ALTER TABLE cliente ADD COLUMN ativo TINYINT(1) NOT NULL DEFAULT 1;

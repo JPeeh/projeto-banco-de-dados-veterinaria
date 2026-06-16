@@ -1,0 +1,14 @@
+
+backend/node_modules/
+
+backend/.env
+
+database/08_fix_collation.sql
+database/09_seed_consultas.sql
+database/10_fix_collation_v2.sql
+database/11_fix_char_size.sql
+database/12_fix_procedures_collation.sql
+database/fix_permissoes_delete.sql
+
+.DS_Store
+Thumbs.db

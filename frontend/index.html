@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VetSystem — Clínica Veterinária</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">🐾</span>
+      <span class="brand-name">VetSystem</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-page="agenda">
+        <span class="nav-icon">📋</span>Agenda
+      </button>
+      <button class="nav-item" data-page="faturamento">
+        <span class="nav-icon">💰</span>Faturamento
+      </button>
+      <button class="nav-item" data-page="pets">
+        <span class="nav-icon">🐾</span>Pets
+      </button>
+      <button class="nav-item" data-page="nova-consulta">
+        <span class="nav-icon">📝</span>Nova Consulta
+      </button>
+      <button class="nav-item" data-page="cadastros">
+        <span class="nav-icon">🗃️</span>Cadastros
+      </button>
+      <button class="nav-item" data-page="logs">
+        <span class="nav-icon">🗂️</span>Logs (MongoDB)
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div id="db-status" class="db-status">Conectando...</div>
+    </div>
+  </aside>
+
+  <div class="content-area">
+
+    <section id="page-agenda" class="page active">
+      <div class="page-header">
+        <div class="page-title">
+          <h1>Agenda de Consultas</h1>
+          <p class="subtitle">view <code>vw_agenda_completa</code></p>
+        </div>
+      </div>
+
+      <div class="filters card">
+        <input type="text" id="busca" placeholder="Buscar pet, cliente ou veterinário..." />
+        <select id="filtro-status">
+          <option value="">Todos os status</option>
+          <option value="agendada">Agendada</option>
+          <option value="realizada">Realizada</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
+        <input type="date" id="filtro-data" />
+        <button id="btn-buscar" class="btn-primary">Buscar</button>
+        <button id="btn-limpar" class="btn-ghost">Limpar</button>
+      </div>
+
+      <div class="card table-card">
+        <div id="agenda-loading" class="state-msg">Carregando...</div>
+        <div id="agenda-error"  class="state-msg state-error hidden"></div>
+        <div id="agenda-empty"  class="state-msg state-empty hidden">Nenhuma consulta encontrada.</div>
+        <div class="table-wrapper">
+          <table id="tabela-agenda" class="hidden">
+            <thead>
+              <tr>
+                <th>ID</th><th>Data / Hora</th><th>Pet</th><th>Espécie</th>
+                <th>Cliente</th><th>Veterinário</th><th>Serviços</th>
+                <th>Total</th><th>Status</th><th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-agenda"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-faturamento" class="page hidden">
+      <div class="page-header">
+        <div class="page-title">
+          <h1>Faturamento</h1>
+          <p class="subtitle">view <code>vw_faturamento_cliente</code></p>
+        </div>
+      </div>
+
+      <div id="fat-loading" class="state-msg">Carregando...</div>
+      <div id="fat-error"   class="state-msg state-error hidden"></div>
+      <div id="fat-empty"   class="state-msg state-empty hidden">Sem dados de faturamento.</div>
+
+      <div id="fat-cards" class="stats-grid"></div>
+
+      <div class="card table-card" style="margin-top:1.5rem">
+        <table id="tabela-fat" class="hidden">
+          <thead>
+            <tr>
+              <th>Cliente</th><th>E-mail</th><th>Telefone</th>
+              <th style="text-align:center">Consultas</th><th>Receita Total</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-fat"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="page-pets" class="page hidden">
+      <div class="page-header">
+        <div class="page-title"><h1>Pets</h1></div>
+        <button class="btn-primary" onclick="abrirModalNovoPet()">+ Novo Pet</button>
+      </div>
+
+      <div class="card table-card">
+        <div id="pets-loading" class="state-msg">Carregando...</div>
+        <div id="pets-error"   class="state-msg state-error hidden"></div>
+        <div id="pets-empty"   class="state-msg state-empty hidden">Nenhum pet cadastrado.</div>
+        <div class="table-wrapper">
+          <table id="tabela-pets" class="hidden">
+            <thead>
+              <tr>
+                <th>Nome</th><th>Espécie</th><th>Raça</th><th>Idade</th>
+                <th>Dono</th><th>Telefone</th><th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-pets"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="page-nova-consulta" class="page hidden">
+      <div class="page-header">
+        <div class="page-title"><h1>Nova Consulta</h1></div>
+      </div>
+
+      <div class="card form-container">
+        <form id="form-consulta">
+          <div class="form-grid">
+
+            <div class="form-group">
+              <label for="sel-pet">Pet *</label>
+              <div class="input-with-btn">
+                <select id="sel-pet" required><option value="">Selecione o pet...</option></select>
+                <button type="button" class="btn-outline" onclick="abrirModalNovoPet('consulta')">+ Novo</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="sel-vet">Veterinário *</label>
+              <div class="input-with-btn">
+                <select id="sel-vet" required><option value="">Selecione...</option></select>
+                <button type="button" class="btn-outline" onclick="abrirModalNovoVet()">+ Novo</button>
+              </div>
+            </div>
+
+            <div class="form-group full">
+              <label for="inp-data">Data e Hora *</label>
+              <input type="datetime-local" id="inp-data" required />
+            </div>
+
+            <div class="form-group full">
+              <div class="section-label">
+                <label>Serviços</label>
+                <button type="button" class="btn-link" onclick="abrirModalNovoServico()">+ Cadastrar novo serviço</button>
+              </div>
+              <div id="servicos-lista" class="servicos-grid"></div>
+            </div>
+
+            <div id="form-msg" class="form-msg hidden full"></div>
+
+            <div class="form-actions full">
+              <button type="submit" class="btn-primary btn-lg">Agendar Consulta</button>
+            </div>
+
+          </div>
+        </form>
+      </div>
+    </section>
+
+  
+    <section id="page-cadastros" class="page hidden">
+      <div class="page-header">
+        <div class="page-title"><h1>Gerenciar Cadastros</h1></div>
+      </div>
+
+
+      <div class="cadastros-section card">
+        <div class="cadastros-section-header">
+          <h2>Pets</h2>
+          <button class="btn-primary btn-sm" onclick="abrirModalNovoPet()">+ Novo Pet</button>
+        </div>
+        <div id="cad-pets-loading" class="state-msg">Carregando...</div>
+        <div id="cad-pets-empty" class="state-msg state-empty hidden">Nenhum pet cadastrado.</div>
+        <div class="table-wrapper">
+          <table id="cad-tabela-pets" class="hidden">
+            <thead><tr><th>Nome</th><th>Espécie</th><th>Raça</th><th>Dono</th><th>Status</th><th></th></tr></thead>
+            <tbody id="cad-tbody-pets"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <div class="cadastros-section card" style="margin-top:1.5rem">
+        <div class="cadastros-section-header">
+          <h2>Clientes / Donos</h2>
+          <button class="btn-primary btn-sm" onclick="abrirModalNovoDono()">+ Novo Cliente</button>
+        </div>
+        <div id="cad-clientes-loading" class="state-msg">Carregando...</div>
+        <div id="cad-clientes-empty" class="state-msg state-empty hidden">Nenhum cliente cadastrado.</div>
+        <div class="table-wrapper">
+          <table id="cad-tabela-clientes" class="hidden">
+            <thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>E-mail</th><th>Endereço</th><th>Status</th><th></th></tr></thead>
+            <tbody id="cad-tbody-clientes"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="cadastros-section card" style="margin-top:1.5rem">
+        <div class="cadastros-section-header">
+          <h2>Veterinários</h2>
+          <button class="btn-primary btn-sm" onclick="abrirModalNovoVet()">+ Novo Veterinário</button>
+        </div>
+        <div id="cad-vets-loading" class="state-msg">Carregando...</div>
+        <div id="cad-vets-empty" class="state-msg state-empty hidden">Nenhum veterinário cadastrado.</div>
+        <div class="table-wrapper">
+          <table id="cad-tabela-vets" class="hidden">
+            <thead><tr><th>Nome</th><th>CRMV</th><th>Especialidade</th><th>Telefone</th><th>Status</th><th></th></tr></thead>
+            <tbody id="cad-tbody-vets"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <div class="cadastros-section card" style="margin-top:1.5rem;margin-bottom:2rem">
+        <div class="cadastros-section-header">
+          <h2>Serviços</h2>
+          <button class="btn-primary btn-sm" onclick="abrirModalNovoServico()">+ Novo Serviço</button>
+        </div>
+        <div id="cad-servicos-loading" class="state-msg">Carregando...</div>
+        <div id="cad-servicos-empty" class="state-msg state-empty hidden">Nenhum serviço cadastrado.</div>
+        <div class="table-wrapper">
+          <table id="cad-tabela-servicos" class="hidden">
+            <thead><tr><th>Nome</th><th>Descrição</th><th>Preço</th><th>Status</th><th></th></tr></thead>
+            <tbody id="cad-tbody-servicos"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="page-logs" class="page hidden">
+      <div class="page-header">
+        <div class="page-title">
+          <h1>Logs de Auditoria</h1>
+          <p class="subtitle">NoSQL — coleção <code>logs</code> no MongoDB</p>
+        </div>
+        <button class="btn-primary" onclick="carregarLogs()">Atualizar</button>
+      </div>
+
+      <div class="filters card">
+        <select id="filtro-log-evento">
+          <option value="">Todos os eventos</option>
+          <option value="consulta_criada">Consulta agendada</option>
+          <option value="consulta_realizada">Consulta realizada</option>
+          <option value="consulta_cancelada">Consulta cancelada</option>
+          <option value="cliente_cadastrado">Cliente cadastrado</option>
+          <option value="veterinario_cadastrado">Veterinário cadastrado</option>
+          <option value="pet_cadastrado">Pet cadastrado</option>
+          <option value="servico_cadastrado">Serviço cadastrado</option>
+        </select>
+        <button class="btn-primary" onclick="carregarLogs()">Filtrar</button>
+      </div>
+
+      <div class="card table-card">
+        <div id="logs-loading" class="state-msg">Carregando...</div>
+        <div id="logs-error"   class="state-msg state-error hidden"></div>
+        <div id="logs-empty"   class="state-msg state-empty hidden">Nenhum log encontrado.</div>
+        <div class="table-wrapper">
+          <table id="tabela-logs" class="hidden">
+            <thead>
+              <tr>
+                <th>Data/Hora</th><th>Evento</th><th>Descrição</th><th>Dados</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-logs"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- .content-area -->
+</div><!-- .layout -->
+
+
+
+<div id="modal-editar" class="modal-overlay hidden">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <h2>Editar Agendamento</h2>
+      <button class="modal-close" onclick="fecharModalEditar()">&times;</button>
+    </div>
+    <form id="form-editar-consulta" class="modal-form">
+      <input type="hidden" id="editar-id" />
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="editar-pet">Pet *</label>
+          <div class="input-with-btn">
+            <select id="editar-pet" required><option value="">Carregando...</option></select>
+            <button type="button" class="btn-outline" onclick="abrirModalNovoPet('editar')">+ Novo</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="editar-vet">Veterinário *</label>
+          <div class="input-with-btn">
+            <select id="editar-vet" required><option value="">Carregando...</option></select>
+            <button type="button" class="btn-outline" onclick="abrirModalNovoVet()">+ Novo</button>
+          </div>
+        </div>
+        <div class="form-group full">
+          <label for="editar-data">Data e Hora *</label>
+          <input type="datetime-local" id="editar-data" required />
+        </div>
+        <div class="form-group full">
+          <label>Serviços</label>
+          <div id="editar-servicos-lista" class="servicos-grid"></div>
+        </div>
+        <div id="editar-msg" class="form-msg hidden full"></div>
+        <div class="form-actions full">
+          <button type="button" class="btn-secondary" onclick="fecharModalEditar()">Cancelar</button>
+          <button type="submit" class="btn-primary">Salvar Alterações</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<div id="modal-realizar" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>Realizar Consulta</h2>
+      <button class="modal-close" onclick="fecharModalRealizar()">&times;</button>
+    </div>
+    <form id="form-realizar-consulta" class="modal-form">
+      <input type="hidden" id="realizar-id" />
+      <div class="form-group full">
+        <label for="realizar-diag">Diagnóstico *</label>
+        <textarea id="realizar-diag" rows="3" required placeholder="Descreva o diagnóstico..."></textarea>
+      </div>
+      <div class="form-group full">
+        <label for="realizar-detalhes">Detalhes do Prontuário *</label>
+        <textarea id="realizar-detalhes" rows="4" required placeholder="Procedimentos realizados, observações clínicas..."></textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" onclick="fecharModalRealizar()">Cancelar</button>
+        <button type="submit" class="btn-success">Confirmar Realização</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<div id="modal-cancelar" class="modal-overlay hidden">
+  <div class="modal-box modal-sm">
+    <div class="modal-header">
+      <h2>Cancelar Consulta</h2>
+      <button class="modal-close" onclick="fecharModalCancelar()">&times;</button>
+    </div>
+    <p class="modal-body-text">Tem certeza que deseja cancelar a consulta <strong id="cancelar-id"></strong>? Esta ação não pode ser desfeita.</p>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="fecharModalCancelar()">Voltar</button>
+      <button class="btn-danger" onclick="confirmarCancelamento()">Sim, cancelar</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="modal-servico" class="modal-overlay hidden">
+  <div class="modal-box modal-sm">
+    <div class="modal-header">
+      <h2>Novo Serviço</h2>
+      <button class="modal-close" onclick="fecharModalNovoServico()">&times;</button>
+    </div>
+    <form id="form-novo-servico" class="modal-form">
+      <div class="form-group full">
+        <label for="srv-nome">Nome *</label>
+        <input type="text" id="srv-nome" required placeholder="Ex: Consulta Geral" />
+      </div>
+      <div class="form-group full">
+        <label for="srv-desc">Descrição</label>
+        <input type="text" id="srv-desc" placeholder="Descrição do serviço (opcional)" />
+      </div>
+      <div class="form-group full">
+        <label for="srv-preco">Preço (R$) *</label>
+        <input type="number" id="srv-preco" required min="0" step="0.01" placeholder="0,00" />
+      </div>
+      <div id="srv-msg" class="form-msg hidden"></div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" onclick="fecharModalNovoServico()">Cancelar</button>
+        <button type="submit" class="btn-primary">Cadastrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<div id="modal-vet" class="modal-overlay hidden" style="z-index:310">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>Novo Veterinário</h2>
+      <button class="modal-close" onclick="fecharModalNovoVet()">&times;</button>
+    </div>
+    <form id="form-novo-vet" class="modal-form">
+      <div class="form-group">
+        <label for="vet-nome">Nome completo *</label>
+        <input type="text" id="vet-nome" required placeholder="Ex: Dra. Maria Santos" />
+      </div>
+      <div class="form-group">
+        <label for="vet-cpf">CPF *</label>
+        <input type="text" id="vet-cpf" required placeholder="Somente números" maxlength="14" />
+      </div>
+      <div class="form-group">
+        <label for="vet-crmv">CRMV *</label>
+        <input type="text" id="vet-crmv" required placeholder="Ex: CRMV-DF99999" />
+      </div>
+      <div class="form-group">
+        <label for="vet-especialidade">Especialidade</label>
+        <input type="text" id="vet-especialidade" placeholder="Ex: Clínica Geral" />
+      </div>
+      <div class="form-group">
+        <label for="vet-telefone">Telefone</label>
+        <input type="text" id="vet-telefone" placeholder="Ex: 61999990000" />
+      </div>
+      <div class="form-group">
+        <label for="vet-email">E-mail</label>
+        <input type="email" id="vet-email" placeholder="ex@email.com" />
+      </div>
+      <div class="form-group">
+        <label for="vet-nasc">Data de Nascimento</label>
+        <input type="date" id="vet-nasc" />
+      </div>
+      <div id="vet-msg" class="form-msg hidden"></div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" onclick="fecharModalNovoVet()">Cancelar</button>
+        <button type="submit" class="btn-primary">Cadastrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<div id="modal-dono" class="modal-overlay hidden" style="z-index:320">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>Novo Dono / Cliente</h2>
+      <button class="modal-close" onclick="fecharModalNovoDono()">&times;</button>
+    </div>
+    <form id="form-novo-dono" class="modal-form">
+      <div class="form-group">
+        <label for="dono-nome">Nome completo *</label>
+        <input type="text" id="dono-nome" required placeholder="Ex: João Silva" />
+      </div>
+      <div class="form-group">
+        <label for="dono-cpf">CPF *</label>
+        <input type="text" id="dono-cpf" required placeholder="Somente números" maxlength="14" />
+      </div>
+      <div class="form-group">
+        <label for="dono-telefone">Telefone</label>
+        <input type="text" id="dono-telefone" placeholder="Ex: 61999990000" />
+      </div>
+      <div class="form-group">
+        <label for="dono-email">E-mail</label>
+        <input type="email" id="dono-email" placeholder="ex@email.com" />
+      </div>
+      <div class="form-group">
+        <label for="dono-nasc">Data de Nascimento</label>
+        <input type="date" id="dono-nasc" />
+      </div>
+      <div class="form-group full">
+        <label for="dono-endereco">Endereço</label>
+        <input type="text" id="dono-endereco" placeholder="Rua, número, bairro" />
+      </div>
+      <div id="dono-msg" class="form-msg hidden"></div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" onclick="fecharModalNovoDono()">Cancelar</button>
+        <button type="submit" class="btn-primary">Cadastrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<div id="modal-pet" class="modal-overlay hidden" style="z-index:300">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>Novo Pet</h2>
+      <button class="modal-close" onclick="fecharModalNovoPet()">&times;</button>
+    </div>
+    <form id="form-novo-pet" class="modal-form">
+      <div class="form-group">
+        <label for="pet-nome">Nome *</label>
+        <input type="text" id="pet-nome" required placeholder="Ex: Rex" />
+      </div>
+      <div class="form-group">
+        <label for="pet-especie">Espécie *</label>
+        <select id="pet-especie" required>
+          <option value="">Selecione...</option>
+          <option value="Cão">Cão</option>
+          <option value="Gato">Gato</option>
+          <option value="Ave">Ave</option>
+          <option value="Réptil">Réptil</option>
+          <option value="Roedor">Roedor</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="pet-raca">Raça</label>
+        <input type="text" id="pet-raca" placeholder="Ex: Labrador (opcional)" />
+      </div>
+      <div class="form-group">
+        <label for="pet-nasc">Data de Nascimento</label>
+        <input type="date" id="pet-nasc" />
+      </div>
+      <div class="form-group full">
+        <label for="pet-dono">Dono *</label>
+        <div class="input-with-btn">
+          <select id="pet-dono" required style="flex:1"><option value="">Carregando...</option></select>
+          <button type="button" class="btn-outline" onclick="abrirModalNovoDono()">+ Novo Dono</button>
+        </div>
+      </div>
+      <div id="pet-msg" class="form-msg hidden"></div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" onclick="fecharModalNovoPet()">Cancelar</button>
+        <button type="submit" class="btn-primary">Cadastrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<div id="modal" class="modal-overlay hidden">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <h2 id="modal-title">Histórico do Pet</h2>
+      <button id="modal-close" class="modal-close">&times;</button>
+    </div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+
+<div id="toast-desfazer" class="toast hidden">
+  <span id="toast-msg"></span>
+  <button class="toast-undo" onclick="desfazerRemocao()">Desfazer</button>
+  <span class="toast-timer"><span id="toast-countdown">5</span>s</span>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
